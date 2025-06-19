@@ -1,0 +1,47 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+
+# Storybook
+storybook-static/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# dotenv environment files
+.env
+.env.local
+.env.*.local
+
+# macOS system files
+.DS_Store
+
+# IDE settings
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Testing coverage
+coverage/
+
+# Optional: lint cache, lockfiles for consistency
+.eslintcache
+*.lock
+
+# Optional: local CLI output or temp files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# OS trash folder
+.Trash
