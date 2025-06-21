@@ -1,8 +1,8 @@
 // highlight.stories.js
 
 import { html } from 'lit';
-import '../src/query-manager/query-input.js';
 import '../src/query-manager/highlight-target.js';
+import '../src/query-manager/query-input.js';
 
 export default {
   title: 'Query Highlight/Scenarios',
@@ -60,47 +60,5 @@ export const MultipleTargets = () => html`
     <div data-highlight>
       Second block includes banana and apple.
     </div>
-  </highlight-target>
-`;
-
-export const WithQueryIndicator = () => html`
-  <query-input key="demo-status" .options=${{
-    splitWords: true,
-  }}></query-input>
-  <highlight-target key="demo-status">
-    <div data-highlight>
-      The quick brown fox jumps over the lazy dog.
-    </div>
-    <div>
-      <strong>Status:</strong>
-      <span id="status"></span>
-    </div>
-  </highlight-target>
-
-  <script type="module">
-    customElements.whenDefined('highlight-target').then(() => {
-      const target = document.querySelector('highlight-target');
-      const status = document.getElementById('status');
-      const updateStatus = () => {
-        status.textContent = `hasQuery: ${target.hasQuery}, localMatch: ${target.hasLocalMatch}, shadowMatch: ${target.hasShadowMatch}, anyMatch: ${target.hasAnyMatch}`;
-      };
-      new MutationObserver(updateStatus).observe(target, { attributes: true });
-      updateStatus();
-    });
-  </script>
-`;
-
-export const NestedTargets = () => html`
-  <query-input key="demo-nested" .options=${{
-    splitWords: true,
-    normalizers: 'default',
-  }}></query-input>
-  <highlight-target key="demo-nested">
-    Outer content with <span data-highlight>apple and orange</span>
-    <highlight-target key="demo-nested">
-      <div data-highlight>
-        Inner block: banana and mango.
-      </div>
-    </highlight-target>
   </highlight-target>
 `;
