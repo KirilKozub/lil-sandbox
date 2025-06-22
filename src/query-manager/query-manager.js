@@ -1,25 +1,15 @@
 /** query-manager.js */
 
-// Stores current query values per key
 const queryStore = new Map();
 const listeners = new Map();
 const queryOptions = new Map();
 const normalizationCache = new Map();
 const originalHTMLCache = new WeakMap();
 
-/**
- * Clears the normalization cache (for debug or reset)
- */
 export function clearNormalizationCache() {
   normalizationCache.clear();
 }
 
-/**
- * Sets a query value by key and notifies all subscribers
- * @param {string} key
- * @param {string} value
- * @param {object} [options]
- */
 export function setQuery(key, value, options) {
   queryStore.set(key, value);
   if (options) queryOptions.set(key, options);
@@ -27,24 +17,15 @@ export function setQuery(key, value, options) {
   if (subs) subs.forEach((cb) => cb(value, queryOptions.get(key)));
 }
 
-/**
- * Gets the current query or options for a key
- */
 export const getQuery = (key) => queryStore.get(key);
 export const getQueryOptions = (key) => queryOptions.get(key);
 
-/**
- * Subscribes to changes of query for a given key
- */
 export function subscribeQuery(key, callback) {
   if (!listeners.has(key)) listeners.set(key, new Set());
   listeners.get(key).add(callback);
   return () => listeners.get(key)?.delete(callback);
 }
 
-/**
- * Normalization presets
- */
 export const normalizerPresets = {
   default: [defaultNormalize],
   strict: [
@@ -69,9 +50,6 @@ export function registerNormalizerPreset(name, steps) {
   normalizerPresets[name] = steps;
 }
 
-/**
- * Resets highlights by restoring original HTML
- */
 export function resetHighlights(container) {
   container.querySelectorAll('[data-highlight]').forEach(el => {
     const original = originalHTMLCache.get(el);
@@ -79,9 +57,6 @@ export function resetHighlights(container) {
   });
 }
 
-/**
- * Highlights text matches in a container
- */
 export function highlightMatches(container, query, options = {}) {
   resetHighlights(container);
 
@@ -103,16 +78,22 @@ export function highlightMatches(container, query, options = {}) {
   highlightEls.forEach(el => {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     const textNodes = [];
+
     while (walker.nextNode()) {
       const node = walker.currentNode;
-      if (node?.parentElement?.closest('[data-highlight]')) {
-        textNodes.push(node);
+
+      if (
+        !node?.textContent?.trim() ||
+        !(node.parentNode instanceof HTMLElement) ||
+        node.parentNode.closest('template, slot') // skip special elements
+      ) {
+        continue;
       }
+
+      textNodes.push(node);
     }
 
     textNodes.forEach(node => {
-      // Prevent modifying Lit-managed parts
-      if (!(node.parentNode instanceof Element)) return;
       const originalText = node.textContent;
       if (!originalText) return;
 
@@ -124,7 +105,7 @@ export function highlightMatches(container, query, options = {}) {
           node.replaceWith(...wrapper.childNodes);
           hasMatch = true;
         } catch (err) {
-          console.warn('[highlight] DOM replace error:', err);
+          console.warn('[highlight] replaceWith failed:', err);
         }
       }
     });
@@ -133,9 +114,6 @@ export function highlightMatches(container, query, options = {}) {
   return { hasLocalMatch: hasMatch };
 }
 
-/**
- * Helpers
- */
 function resolveNormalizers(input) {
   if (!input) return normalizerPresets.default;
   if (typeof input === 'string') return normalizerPresets[input] || normalizerPresets.default;
@@ -207,9 +185,6 @@ function getMarkedHTML(text, terms, exact = false, normalizers = normalizerPrese
   return result || text;
 }
 
-/**
- * LitElement mixin to sync source/target components with query updates
- */
 export function mixinQuerySync(Base, { type, key, highlightOptions }) {
   return class extends Base {
     static properties = {
