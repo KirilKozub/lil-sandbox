@@ -1,4 +1,4 @@
-/** query-manager.js */
+// query-manager.js
 
 const queryStore = new Map();
 const listeners = new Map();
@@ -58,6 +58,8 @@ export function resetHighlights(container) {
 }
 
 export function highlightMatches(container, query, options = {}) {
+  if (!container) return { hasLocalMatch: false };
+
   resetHighlights(container);
 
   const highlightEls = container.querySelectorAll('[data-highlight]');
@@ -81,11 +83,10 @@ export function highlightMatches(container, query, options = {}) {
 
     while (walker.nextNode()) {
       const node = walker.currentNode;
-
       if (
         !node?.textContent?.trim() ||
         !(node.parentNode instanceof HTMLElement) ||
-        node.parentNode.closest('template, slot') // skip special elements
+        node.parentNode.closest('template, slot')
       ) {
         continue;
       }
@@ -197,25 +198,21 @@ export function mixinQuerySync(Base, { type, key, highlightOptions }) {
     connectedCallback() {
       super.connectedCallback?.();
       if (type === 'target') {
-        this.__unsub = subscribeQuery(key, (query, opts) => {
+        const processQuery = (query, opts) => {
+          const container = this.renderRoot?.querySelector('[data-highlight-container]');
+          if (!container) return;
           this.hasQuery = Boolean(query?.trim());
           const activeOptions = opts || getQueryOptions(key) || {};
-          const { hasLocalMatch } = highlightMatches(this.renderRoot, query, activeOptions);
+          const { hasLocalMatch } = highlightMatches(container, query, activeOptions);
           this.hasLocalMatch = hasLocalMatch;
           this.hasShadowMatch = Array.from(this.renderRoot?.querySelectorAll('[has-local-match]') || [])
-            .some((el) => el.hasAttribute('has-local-match'));
+            .some((el) => el !== this && el.hasAttribute('has-local-match'));
           this.hasAnyMatch = this.hasLocalMatch || this.hasShadowMatch;
-        });
+        };
 
+        this.__unsub = subscribeQuery(key, processQuery);
         const current = getQuery(key);
-        if (current) {
-          const { hasLocalMatch } = highlightMatches(this.renderRoot, current, getQueryOptions(key) || {});
-          this.hasQuery = Boolean(current?.trim());
-          this.hasLocalMatch = hasLocalMatch;
-          this.hasShadowMatch = Array.from(this.renderRoot?.querySelectorAll('[has-local-match]') || [])
-            .some((el) => el.hasAttribute('has-local-match'));
-          this.hasAnyMatch = this.hasLocalMatch || this.hasShadowMatch;
-        }
+        if (current) processQuery(current, getQueryOptions(key));
       }
     }
 
