@@ -1,18 +1,28 @@
 import { LitElement } from 'lit';
 
-// Глобальный стор для подписок: { [key]: Set<callback> }
+/**
+ * A global subscription map where:
+ * key → Set of subscriber callbacks
+ * Example:
+ * 'search-key' → Set of (value) => { ... }
+ */
 const subscriptions = new Map();
 
 /**
- * Первый модификатор: отслеживает изменение свойства и уведомляет подписчиков.
- * @param {typeof LitElement} BaseClass
- * @param {string} watchedProp - свойство, за которым следим
- * @param {string} key - ключ связи
+ * Modifier #1 — Tracks changes to a specific property and notifies all subscribers for the given key.
+ *
+ * @param {typeof LitElement} BaseClass - The base Lit component class
+ * @param {string} watchedProp - The property name to observe for changes
+ * @param {string} key - The shared subscription key
+ * @returns {typeof LitElement} - A new class with tracking functionality
  */
 export function TrackProperty(BaseClass, watchedProp, key) {
   return class extends BaseClass {
     updated(changedProps) {
+      // Call the original updated() if defined
       super.updated?.(changedProps);
+
+      // If the tracked property changed, notify all subscribers for this key
       if (changedProps.has(watchedProp)) {
         const newValue = this[watchedProp];
         const subs = subscriptions.get(key);
@@ -25,38 +35,42 @@ export function TrackProperty(BaseClass, watchedProp, key) {
 }
 
 /**
- * Второй модификатор: подписывается на обновления из первого и сохраняет результат в реактивное свойство.
- * @param {typeof LitElement} BaseClass
- * @param {string} targetProp - реактивное свойство, куда писать
- * @param {string} key - ключ связи
+ * Modifier #2 — Subscribes to changes from a shared key and updates a reactive property.
+ *
+ * @param {typeof LitElement} BaseClass - The base Lit component class
+ * @param {string} targetProp - The name of the reactive property to assign received values to
+ * @param {string} key - The subscription key to listen on
+ * @returns {typeof LitElement} - A new class with subscription logic
  */
 export function SubscribeToProperty(BaseClass, targetProp, key) {
   return class extends BaseClass {
     static properties = {
       ...super.properties,
-      [targetProp]: { type: Object },
+      [targetProp]: {}, // Make the target property reactive (any type)
     };
 
     constructor() {
       super();
-      const updateValue = (value) => {
+
+      // Define the callback that receives new values
+      this._subscriptionCallback = (value) => {
         this[targetProp] = value;
       };
 
-      // Подписываемся
+      // Register the callback in the global subscription list
       if (!subscriptions.has(key)) {
         subscriptions.set(key, new Set());
       }
-      subscriptions.get(key).add(updateValue);
+      subscriptions.get(key).add(this._subscriptionCallback);
     }
 
     disconnectedCallback() {
       super.disconnectedCallback?.();
+
+      // Remove subscription when component is disconnected
       const subs = subscriptions.get(key);
       if (subs) {
-        subs.forEach(cb => {
-          if (cb.name === 'updateValue') subs.delete(cb);
-        });
+        subs.delete(this._subscriptionCallback);
       }
     }
   };
