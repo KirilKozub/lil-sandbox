@@ -12,6 +12,9 @@ const queryOptions = new Map();
 // Caches normalized results for performance
 const normalizationCache = new Map();
 
+// Stores original innerHTML of highlight nodes
+const originalHTMLCache = new WeakMap();
+
 /**
  * Clears the normalization cache (for debug or reset)
  */
@@ -97,6 +100,19 @@ export function registerNormalizerPreset(name, steps) {
 }
 
 /**
+ * Resets highlights by restoring original HTML in all highlight targets
+ * @param {HTMLElement} container
+ */
+export function resetHighlights(container) {
+  container.querySelectorAll('[data-highlight]').forEach((el) => {
+    const originalHTML = originalHTMLCache.get(el);
+    if (originalHTML !== undefined) {
+      el.innerHTML = originalHTML;
+    }
+  });
+}
+
+/**
  * Highlights matches inside container based on query
  * @param {HTMLElement} container
  * @param {string} query
@@ -104,9 +120,12 @@ export function registerNormalizerPreset(name, steps) {
  * @returns {{ hasLocalMatch: boolean }}
  */
 export function highlightMatches(container, query, options = {}) {
-  // Clear previous highlights
-  container.querySelectorAll('mark').forEach((mark) => {
-    mark.replaceWith(...mark.childNodes);
+  resetHighlights(container);
+
+  container.querySelectorAll('[data-highlight]').forEach((el) => {
+    if (!originalHTMLCache.has(el)) {
+      originalHTMLCache.set(el, el.innerHTML);
+    }
   });
 
   if (!query?.trim()) return { hasLocalMatch: false };
