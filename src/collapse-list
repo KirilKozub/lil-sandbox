@@ -1,0 +1,37 @@
+import './my-collapse-item.js'; import './my-collapse-list.js';
+
+export default { title: 'Components/Collapse List', component: 'my-collapse-list', argTypes: { singleOpen: { control: 'boolean', description: 'Allow only one open item at a time', defaultValue: false, }, item1InitialOpen: { control: 'boolean', name: 'Item 1: initialOpen' }, item2InitialOpen: { control: 'boolean', name: 'Item 2: initialOpen' }, item3InitialOpen: { control: 'boolean', name: 'Item 3: initialOpen' }, item1AllowClick: { control: 'boolean', name: 'Item 1: allowOpenOnContainerClick' }, item2AllowClick: { control: 'boolean', name: 'Item 2: allowOpenOnContainerClick' }, item3AllowClick: { control: 'boolean', name: 'Item 3: allowOpenOnContainerClick' }, }, };
+
+const Template = ({ singleOpen, item1InitialOpen, item2InitialOpen, item3InitialOpen, item1AllowClick, item2AllowClick, item3AllowClick, }) => { return ` <my-collapse-list id="exampleList" ?singleOpen="${singleOpen}"> <div class="list-item"> <my-collapse-item ?initialOpen="${item1InitialOpen}" ?allowOpenOnContainerClick="${item1AllowClick}" > <span slot="summary">Summary 1</span> <div slot="details"> <p>Details content for Item 1</p> <button>Focusable Button</button> </div> </my-collapse-item> </div>
+
+<div class="list-item">
+    <my-collapse-item
+      ?initialOpen="${item2InitialOpen}"
+      ?allowOpenOnContainerClick="${item2AllowClick}"
+    >
+      <span slot="summary">Summary 2</span>
+      <div slot="details">
+        <p>Details content for Item 2</p>
+        <a href="#">Focusable Link</a>
+      </div>
+    </my-collapse-item>
+  </div>
+
+  <div class="list-item">
+    <my-collapse-item
+      ?initialOpen="${item3InitialOpen}"
+      ?allowOpenOnContainerClick="${item3AllowClick}"
+    >
+      <span slot="summary">Summary 3</span>
+      <div slot="details">
+        <p>Details content for Item 3</p>
+        <input type="text" placeholder="Focusable input" />
+      </div>
+    </my-collapse-item>
+  </div>
+</my-collapse-list>
+
+`; };
+
+export const Default = Template.bind({}); Default.args = { singleOpen: false, item1InitialOpen: false, item2InitialOpen: false, item3InitialOpen: false, item1AllowClick: true, item2AllowClick: true, item3AllowClick: true, };
+
