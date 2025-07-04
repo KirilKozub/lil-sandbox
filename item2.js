@@ -1,79 +1,138 @@
 import { LitElement, html, css } from 'lit';
 
-export class MyCollapseList extends LitElement {
+export class MyCollapseItem extends LitElement {
   static properties = {
-    singleOpen: { type: Boolean },
-    header: { type: String },
-    footer: { type: String },
+    open: { type: Boolean, reflect: true },
+    initialOpen: { type: Boolean },
+    allowOpenOnContainerClick: { type: Boolean },
+    title: { type: String },
+    subtitle: { type: String },
+    tags: { type: Array },
   };
 
   constructor() {
     super();
-    this.singleOpen = false;
-    this.header = '';
-    this.footer = '';
+    this.open = false;
+    this.initialOpen = false;
+    this.allowOpenOnContainerClick = true;
+    this.title = '';
+    this.subtitle = '';
+    this.tags = [];
   }
 
-  get items() {
-    const list = Array.from(this.querySelectorAll('my-collapse-item'));
-    list.forEach((item, index) => {
-      item.dataset.index = index;
-    });
-    return list;
+  connectedCallback() {
+    super.connectedCallback();
+    this.open = this.initialOpen;
   }
 
-  firstUpdated() {
-    this.addEventListener('toggle', (e) => {
-      const { index, open } = e.detail;
-      if (this.singleOpen && open) {
-        this.items.forEach((item, i) => {
-          if (i !== index && item.open) item.open = false;
-        });
-      }
-    });
+  toggle() {
+    this.open = !this.open;
+    this.dispatchEvent(new CustomEvent('toggle', {
+      detail: { open: this.open, index: Number(this.dataset.index) },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  handleContainerClick() {
+    if (!this.open && this.allowOpenOnContainerClick) {
+      this.toggle();
+    }
   }
 
   render() {
     return html`
-      <div class="list-container">
-        ${this.header ? html`<div class="list-header">${this.header}</div>` : ''}
+      <div class="container" @click=${this.handleContainerClick}>
+        <div class="header">
+          <div class="title">${this.title}</div>
+          <div class="subtitle">${this.subtitle}</div>
+        </div>
 
-        <div role="list" class="list-body">
+        <div class="content ${this.open ? 'expanded' : 'collapsed'}">
           <slot></slot>
         </div>
 
-        ${this.footer ? html`<div class="list-footer">${this.footer}</div>` : ''}
+        ${this.tags?.length
+          ? html`<div class="footer">
+              ${this.tags.map(tag => html`<span class="tag">${tag}</span>`)}
+            </div>`
+          : ''}
+
+        <button @click=${(e) => { e.stopPropagation(); this.toggle(); }}>
+          ${this.open ? '🔽' : '▶️'}
+        </button>
       </div>
     `;
   }
 
   static styles = css`
-    .list-container {
-      border: 1px solid #ddd;
-      border-radius: 6px;
+    :host {
+      display: block;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 8px;
       overflow: hidden;
+      position: relative;
+    }
+
+    .container {
+      position: relative;
+      padding: 12px 40px 12px 12px;
       background: #fff;
+      cursor: pointer;
     }
 
-    .list-header {
-      padding: 12px;
-      background: #f5f5f5;
+    .header {
+      margin-bottom: 8px;
+    }
+
+    .title {
       font-weight: bold;
-      border-bottom: 1px solid #ddd;
+      font-size: 16px;
     }
 
-    .list-body {
-      padding: 8px;
-    }
-
-    .list-footer {
-      padding: 12px;
-      background: #f5f5f5;
-      border-top: 1px solid #ddd;
+    .subtitle {
       font-size: 12px;
       color: #666;
+    }
+
+    .content.collapsed {
+      max-height: 60px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+    }
+
+    .content.expanded {
+      max-height: none;
+    }
+
+    .footer {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .tag {
+      background: #f0f0f0;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 11px;
+    }
+
+    button {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
     }
   `;
 }
 
-customElements.define('my-collapse-list', MyCollapseList);
+customElements.define('my-collapse-item', MyCollapseItem);
