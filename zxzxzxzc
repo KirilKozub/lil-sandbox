@@ -1,0 +1,8 @@
+const mapUpcomingFeatures = async () => {
+  const entries = Object.entries(newFeaturesData.upcomingFeatures);
+  const mappedFeatures = await Promise.all(entries.map(async (itemEntry) => ({
+    label: await msgAsync(`UPCOMING_FEATURES.LIST.${itemEntry[0]}.LABEL`),
+    description: await msgAsync(`UPCOMING_FEATURES.LIST.${itemEntry[0]}.DESCRIPTION`),
+  })));
+  return mappedFeatures;
+};
