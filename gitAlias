@@ -19,3 +19,40 @@ open ~/.gitconfig
         fi; \
         git checkout master && git branch -D \"$branch\"; \
     }; f"
+
+
+[alias]
+    prerelease = "!f() { \
+        branch=$(git rev-parse --abbrev-ref HEAD); \
+        if [[ \"$branch\" =~ ^feature/SME-([0-9]+)$ ]]; then \
+            id=${BASH_REMATCH[1]}; \
+            base=\"prerelease/SME-$id\"; \
+            exists=$(git show-ref --verify --quiet refs/heads/$base || git ls-remote --exit-code --heads origin $base >/dev/null 2>&1 && echo 1); \
+            if [ \"$exists\" = \"1\" ]; then \
+                echo \"⚠️  Ветка $base уже существует.\"; \
+                read -p \"❓ Создать с суффиксом (-1, -2...)? [y/N]: \" yn; \
+                case $yn in \
+                    [Yy]*) \
+                        i=1; \
+                        while true; do \
+                            new_branch=\"$base-$i\"; \
+                            git show-ref --verify --quiet refs/heads/$new_branch || git ls-remote --exit-code --heads origin $new_branch >/dev/null 2>&1 || break; \
+                            i=$((i+1)); \
+                        done; \
+                        echo \"➡️  Создаётся ветка: $new_branch\"; \
+                        git checkout -b \"$new_branch\"; \
+                        ;; \
+                    *) \
+                        echo \"❌ Операция отменена.\"; \
+                        exit 1; \
+                        ;; \
+                esac; \
+            else \
+                echo \"➡️  Создаётся ветка: $base\"; \
+                git checkout -b \"$base\"; \
+            fi; \
+        else \
+            echo \"❌ Текущая ветка не соответствует шаблону feature/SME-XXXXXX\"; \
+            exit 1; \
+        fi; \
+    }; f"
