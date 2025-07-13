@@ -8,3 +8,14 @@ open ~/.gitconfig
         fi; \
         git checkout master && git pull && git checkout -b feature/SME-$1; \
     }; f"
+
+
+[alias]
+    delete-branch = "!f() { \
+        branch=$(git symbolic-ref --short HEAD); \
+        if [ \"$branch\" = \"master\" ]; then \
+            echo '❌ Нельзя удалить ветку master'; \
+            exit 1; \
+        fi; \
+        git checkout master && git branch -D \"$branch\"; \
+    }; f"
