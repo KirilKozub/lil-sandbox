@@ -1,1 +1,10 @@
 open ~/.gitconfig
+
+[alias]
+    task = "!f() { \
+        if [ -z \"$1\" ]; then \
+            echo '❌ Укажи номер задачи, например: git task 123456'; \
+            exit 1; \
+        fi; \
+        git checkout master && git pull && git checkout -b feature/SME-$1; \
+    }; f"
