@@ -1,0 +1,20 @@
+ing-accordion {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* Чтобы пары "h3 + content" шли вместе по колонкам */
+ing-accordion > h3[slot="_accordion"]:nth-of-type(4n + 1),
+ing-accordion > h3[slot="_accordion"]:nth-of-type(4n + 2),
+ing-accordion > ing-accordion-content[slot="_accordion"]:nth-of-type(4n + 1),
+ing-accordion > ing-accordion-content[slot="_accordion"]:nth-of-type(4n + 2) {
+  grid-column: 1;
+}
+
+ing-accordion > h3[slot="_accordion"]:nth-of-type(4n + 3),
+ing-accordion > h3[slot="_accordion"]:nth-of-type(4n + 4),
+ing-accordion > ing-accordion-content[slot="_accordion"]:nth-of-type(4n + 3),
+ing-accordion > ing-accordion-content[slot="_accordion"]:nth-of-type(4n + 4) {
+  grid-column: 2;
+}
