@@ -4,17 +4,19 @@ ing-accordion {
   gap: 24px;
 }
 
-/* Чтобы пары "h3 + content" шли вместе по колонкам */
-ing-accordion > h3[slot="_accordion"]:nth-of-type(4n + 1),
-ing-accordion > h3[slot="_accordion"]:nth-of-type(4n + 2),
-ing-accordion > ing-accordion-content[slot="_accordion"]:nth-of-type(4n + 1),
-ing-accordion > ing-accordion-content[slot="_accordion"]:nth-of-type(4n + 2) {
+/* Слоты рендерятся напрямую в DOM, можно использовать ::slotted */
+ing-accordion::slotted(h3[slot="_accordion"]),
+ing-accordion::slotted(ing-accordion-content[slot="_accordion"]) {
+  display: block;
+}
+
+/* Распределение по колонкам */
+ing-accordion::slotted(h3[slot="_accordion"]:nth-of-type(4n + 1)),
+ing-accordion::slotted(h3[slot="_accordion"]:nth-of-type(4n + 1) + ing-accordion-content) {
   grid-column: 1;
 }
 
-ing-accordion > h3[slot="_accordion"]:nth-of-type(4n + 3),
-ing-accordion > h3[slot="_accordion"]:nth-of-type(4n + 4),
-ing-accordion > ing-accordion-content[slot="_accordion"]:nth-of-type(4n + 3),
-ing-accordion > ing-accordion-content[slot="_accordion"]:nth-of-type(4n + 4) {
+ing-accordion::slotted(h3[slot="_accordion"]:nth-of-type(4n + 3)),
+ing-accordion::slotted(h3[slot="_accordion"]:nth-of-type(4n + 3) + ing-accordion-content) {
   grid-column: 2;
 }
