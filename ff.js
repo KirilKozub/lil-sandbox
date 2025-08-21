@@ -1,5 +1,8 @@
 gSf56$#@tghFghv
 
+code ~/.gitconfig
+
+
 Sehr geehrte Damen und Herren,
 
 mein Name ist Petro Maliuha, geboren am 04.03.1948. Ich war Patient in Ihrer augenärztlichen Praxis.
