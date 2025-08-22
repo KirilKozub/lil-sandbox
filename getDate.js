@@ -17,3 +17,25 @@ export function getDate(offsetDays = 0, baseDate = new Date()) {
 
   return `${year}-${month}-${day}`;
 }
+
+
+
+
+/**
+ * Checks if a date is in range [start, end].
+ * @param {string|Date} date - Date to check.
+ * @param {string|Date} start - Start of range.
+ * @param {string|Date} end - End of range.
+ * @returns {boolean} True if in range, false otherwise.
+ */
+export function isDateInRange(date, start, end) {
+  const d = new Date(date);
+  const s = new Date(start);
+  const e = new Date(end);
+
+  if (isNaN(d) || isNaN(s) || isNaN(e)) {
+    throw new Error('Invalid date format');
+  }
+
+  return d.getTime() >= s.getTime() && d.getTime() <= e.getTime();
+}
