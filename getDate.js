@@ -39,3 +39,21 @@ export function isDateInRange(date, start, end) {
 
   return d.getTime() >= s.getTime() && d.getTime() <= e.getTime();
 }
+
+
+/**
+ * Checks if the second date is the same as or earlier than the first date.
+ * @param {string} firstDate - First date in YYYY-MM-DD format.
+ * @param {string} secondDate - Second date in YYYY-MM-DD format.
+ * @returns {boolean} True if second date is the same as or earlier than first.
+ */
+export function isSameOrBefore(firstDate, secondDate) {
+  const d1 = new Date(firstDate);
+  const d2 = new Date(secondDate);
+
+  if (isNaN(d1) || isNaN(d2)) {
+    throw new Error('Invalid date format');
+  }
+
+  return d2.getTime() <= d1.getTime();
+}
