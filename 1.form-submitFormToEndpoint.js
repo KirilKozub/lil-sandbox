@@ -1,43 +1,76 @@
 /**
  * @file submitFormToEndpoint.js
  * @description
- * Dynamically creates a <form>, injects hidden inputs, submits it (GET/POST), then removes it.
- * Intended for real browser navigations (e.g., POST handoff to 3rd-party) where fetch/XHR is not suitable.
+ * Dynamically creates a <form>, injects hidden inputs, submits it (GET/POST), and removes it.
+ * Designed for secure handoff flows where a real browser navigation (not fetch/XHR) is required.
  *
- * Secure defaults:
- * - novalidate (skip HTML5 validation)
- * - autocomplete="off"
- * - referrerpolicy="no-referrer"
- * - rel auto-enforcement: if opening a new tab and `rel` is not provided, force "noopener noreferrer"
+ * ✅ Features:
+ * - Supports HTMLElement or ShadowRoot as context.
+ * - Secure defaults: novalidate, autocomplete="off", referrerpolicy="no-referrer".
+ * - Auto-enforces rel="noopener noreferrer" if opening new tab and rel not set.
+ * - Optional serializeGetInUrl to inline GET params into URL.
+ * - Focus attempt only for named tabs (reuse case), ignored for _blank.
  */
 
 /**
  * @typedef {Object} SubmitFormOptions
- * @property {string} action                                Destination URL (form.action).
- * @property {'post'|'get'} [method='post']                 HTTP method; for GET the fields become query params.
- * @property {Array<{name:string,value:any}>} fields        Hidden inputs; values are coerced with String(value). Empty `name` is ignored.
- * @property {HTMLElement} [context]                        Container to temporarily attach the form (default: document.body). Must be in live DOM.
- * @property {boolean} [openInNewTab=false]                 If true, submit to a new browsing context (named or _blank).
- * @property {string} [newTabName='']                       Name of the tab/window to enable re-use. Empty → _blank when openInNewTab=true.
- * @property {boolean} [focusNewTab=true]                   Best-effort focusing of the named tab after submit (may be ignored by browsers).
+ * @property {string} action
+ *  Destination URL (form.action)
+ *
+ * @property {'post'|'get'} [method='post']
+ *  HTTP method; for GET the fields become query params.
+ *
+ * @property {Array<{name:string,value:any}>} fields
+ *  Fields to send. Values are coerced with String(value). Empty `name` ignored.
+ *
+ * @property {HTMLElement|ShadowRoot} [context]
+ *  Where to temporarily attach the form. Can be a ShadowRoot (if connected to document).
+ *  Must be in live DOM; DocumentFragment will NOT work.
+ *
+ * @property {boolean} [openInNewTab=false]
+ *  If true, submit into a new tab/window (target=_blank or named).
+ *
+ * @property {string} [newTabName='']
+ *  Named browsing context for reuse (e.g. "handoff_tab").
+ *
+ * @property {boolean} [focusNewTab=true]
+ *  Attempt to focus the reused tab after submit. Works only for named tabs.
+ *
  * @property {'application/x-www-form-urlencoded'|'multipart/form-data'} [enctype='application/x-www-form-urlencoded']
- *                                                         Encoding type; urlencoded is typical for hidden fields.
- * @property {string} [acceptCharset='utf-8']               Form charset.
- * @property {boolean} [novalidate=true]                    Add novalidate to skip built-in HTML5 validation.
- * @property {'on'|'off'} [autocomplete='off']              Form-level autocomplete hint.
- * @property {string} [referrerPolicy='no-referrer']        Form referrer policy attribute (best-effort; modern browsers).
- * @property {string} [rel]                                 Custom rel attribute. If omitted and opening a new tab, "noopener noreferrer" is auto-applied.
+ *  Form encoding type.
+ *
+ * @property {string} [acceptCharset='utf-8']
+ *  Charset for form submission.
+ *
+ * @property {boolean} [novalidate=true]
+ *  Skip HTML5 validation before submit.
+ *
+ * @property {'on'|'off'} [autocomplete='off']
+ *  Form-level autocomplete hint.
+ *
+ * @property {string} [referrerPolicy='no-referrer']
+ *  Referrer policy (modern browsers only).
+ *
+ * @property {string} [rel]
+ *  Custom rel attribute. If omitted and opening new tab, automatically enforced "noopener noreferrer".
+ *
+ * @property {boolean} [serializeGetInUrl=false]
+ *  For GET requests, append fields directly to action URL (instead of hidden inputs).
+ *
  * @property {(ctx:{form:HTMLFormElement, fields:Record<string,string>})=>void} [onBeforeSubmit]
- *                                                         Hook just before submit(); errors are isolated.
+ *  Hook executed right before submit().
+ *
  * @property {(ctx:{form:HTMLFormElement})=>void} [onAfterSubmit]
- *                                                         Hook right after submit(); errors are isolated.
- * @property {(err:unknown)=>void} [onError]                Hook on thrown errors (validation/runtime).
+ *  Hook executed immediately after submit().
+ *
+ * @property {(err:unknown)=>void} [onError]
+ *  Hook called if an error is thrown (validation/runtime).
  */
 
 /**
- * Submit a real HTML form to an endpoint and then remove it from the DOM.
+ * Dynamically creates, submits, and cleans up an HTML form.
  * @param {SubmitFormOptions} opts
- * @throws {Error} If required options are missing/invalid.
+ * @throws {Error} If invalid or missing options.
  */
 export function submitFormToEndpoint(opts) {
   const {
@@ -53,18 +86,18 @@ export function submitFormToEndpoint(opts) {
     novalidate = true,
     autocomplete = 'off',
     referrerPolicy = 'no-referrer',
-    // NOTE: rel is optional; if omitted and openInNewTab=true, we will enforce "noopener noreferrer".
     rel,
+    serializeGetInUrl = false,
     onBeforeSubmit,
     onAfterSubmit,
     onError,
   } = opts ?? {};
 
-  /** @type {HTMLFormElement | undefined} */
+  /** @type {HTMLFormElement|undefined} */
   let form;
 
   try {
-    // ---- Validate essentials
+    // --- Basic validation
     if (!action || typeof action !== 'string') {
       throw new Error('submitFormToEndpoint: "action" is required (string).');
     }
@@ -72,34 +105,71 @@ export function submitFormToEndpoint(opts) {
       throw new Error('submitFormToEndpoint: "fields" must be a non-empty array.');
     }
 
-    /** @type {HTMLElement} */
-    const host = context instanceof HTMLElement ? context : document.body;
+    /**
+     * Resolve context where the temporary form will be attached.
+     * Supports HTMLElement and ShadowRoot.
+     * @param {unknown} ctx
+     * @returns {HTMLElement|ShadowRoot}
+     */
+    const resolveHost = (ctx) => {
+      if (ctx && typeof ctx === 'object') {
+        const isShadowRoot =
+          (typeof ShadowRoot !== 'undefined' && ctx instanceof ShadowRoot) ||
+          (ctx.nodeType === 11 && 'host' in ctx);
+        if (isShadowRoot) {
+          return ctx.isConnected ? ctx : document.body;
+        }
+        if (ctx instanceof HTMLElement) {
+          return ctx.isConnected ? ctx : document.body;
+        }
+      }
+      return document.body;
+    };
 
-    // ---- Create the form element
+    const host = resolveHost(context);
+
+    // --- Prepare URL and fields
+    let finalAction = action;
+    /** @type {Record<string,string>} */
+    const flat = {};
+    for (const f of fields) {
+      if (!f?.name) continue;
+      flat[f.name] = f.value != null ? String(f.value) : '';
+    }
+
+    // --- Optional: serialize GET fields directly into URL
+    if (method.toLowerCase() === 'get' && serializeGetInUrl) {
+      try {
+        const url = new URL(finalAction, window.location.href);
+        for (const [k, v] of Object.entries(flat)) url.searchParams.append(k, v);
+        finalAction = url.toString();
+      } catch {
+        const sep = finalAction.includes('?') ? '&' : '?';
+        const q = Object.entries(flat)
+          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+          .join('&');
+        finalAction = finalAction + sep + q;
+      }
+    }
+
+    // --- Create form
     form = document.createElement('form');
 
-    // Defensive defaults (customizable)
+    // Defensive attributes
     if (novalidate) form.setAttribute('novalidate', '');
     if (autocomplete) form.setAttribute('autocomplete', autocomplete);
     if (referrerPolicy) form.setAttribute('referrerpolicy', referrerPolicy);
 
-    // Action/method/encoding
-    form.action = action;
+    form.action = finalAction;
     form.method = method.toLowerCase() === 'get' ? 'get' : 'post';
     form.enctype = enctype;
     form.acceptCharset = acceptCharset;
 
-    // Target & rel behavior:
-    // - If openInNewTab=true, set target to named or _blank.
-    // - If rel is NOT provided and we're opening a new tab, force "noopener noreferrer" (secure-by-default).
-    // - If rel IS provided, apply it verbatim.
-    // - If openInNewTab=false and rel is provided, we respect it (though it typically matters only for new contexts).
+    // --- Target & rel logic
     if (openInNewTab) {
       form.target = newTabName || '_blank';
-
       if (rel == null || rel === '') {
-        // Auto-enforce safe default to mitigate tabnabbing and referrer leakage
-        form.setAttribute('rel', 'noopener noreferrer');
+        form.setAttribute('rel', 'noopener noreferrer'); // secure default
       } else {
         form.setAttribute('rel', rel);
       }
@@ -107,53 +177,46 @@ export function submitFormToEndpoint(opts) {
       form.setAttribute('rel', rel);
     }
 
-    // ---- Hidden inputs
-    /** @type {Record<string,string>} */
-    const flat = {};
-    for (const { name, value } of fields) {
-      if (!name) continue;
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = String(name);
-      input.value = value != null ? String(value) : '';
-      form.appendChild(input);
-      flat[input.name] = input.value;
-    }
-
-    // ---- Attach to live DOM (required for submit())
-    host.appendChild(form);
-
-    // ---- Pre-submit hook (isolated)
-    try {
-      onBeforeSubmit?.({ form, fields: flat });
-    } catch {
-      // ignore hook errors
-    }
-
-    // ---- Submit (triggers navigation)
-    form.submit();
-
-    // ---- Best-effort focus of named target
-    if (openInNewTab && focusNewTab && form.target && form.target !== '_self') {
-      try {
-        const win = window.open('', form.target);
-        win?.focus?.();
-      } catch {
-        // ignore
+    // --- Add hidden inputs unless GET was serialized directly
+    if (!(method.toLowerCase() === 'get' && serializeGetInUrl)) {
+      for (const { name, value } of fields) {
+        if (!name) continue;
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = String(name);
+        input.value = value != null ? String(value) : '';
+        form.appendChild(input);
       }
     }
 
-    // ---- Post-submit hook (isolated)
-    try {
-      onAfterSubmit?.({ form });
-    } catch {
-      // ignore hook errors
+    // --- Attach to DOM (required for submit())
+    host.appendChild(form);
+
+    // --- Hooks
+    try { onBeforeSubmit?.({ form, fields: flat }); } catch {}
+
+    form.submit();
+
+    // --- Best-effort focus only for named tabs (reuse)
+    if (
+      openInNewTab &&
+      focusNewTab &&
+      newTabName &&
+      form.target === newTabName
+    ) {
+      try {
+        const win = window.open('', newTabName);
+        win?.focus?.();
+      } catch {
+        // ignored (browser restrictions)
+      }
     }
+
+    try { onAfterSubmit?.({ form }); } catch {}
   } catch (err) {
-    try { onError?.(err); } catch { /* ignore */ }
+    try { onError?.(err); } catch {}
     throw err;
   } finally {
-    // ---- Cleanup
-    try { form?.remove(); } catch { /* ignore */ }
+    try { form?.remove(); } catch {}
   }
 }
