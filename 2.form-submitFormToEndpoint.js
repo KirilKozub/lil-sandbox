@@ -1,4 +1,4 @@
-// test/submitFormToEndpoint.test.js
+8// test/submitFormToEndpoint.test.js
 import { expect } from '@open-wc/testing';
 import sinon from 'sinon';
 import { submitFormToEndpoint } from '../src/submitFormToEndpoint.js';
@@ -296,4 +296,29 @@ describe('submitFormToEndpoint (updated)', () => {
     });
     expect(formRef.querySelectorAll('input[type="hidden"]').length).to.equal(40);
   });
+});
+
+
+
+it('form exists in onBeforeSubmit and is removed after call', () => {
+  let seenInBefore = false;
+  submitFormToEndpoint({
+    action: '/x',
+    fields: [{ name: 'a', value: '1' }],
+    onBeforeSubmit: ({ form }) => {
+      seenInBefore = document.body.contains(form); // true
+    },
+  });
+  expect(seenInBefore).to.equal(true);
+  expect(document.body.querySelector('form')).to.equal(null); // removed
+});
+
+
+it('removes the form even if after-hook throws', () => {
+  submitFormToEndpoint({
+    action: '/x',
+    fields: [{ name: 'a', value: '1' }],
+    onAfterSubmit: () => { throw new Error('boom'); },
+  });
+  expect(document.body.querySelector('form')).to.equal(null);
 });
