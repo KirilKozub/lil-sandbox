@@ -15,57 +15,61 @@
 /**
  * @typedef {Object} SubmitFormOptions
  * @property {string} action
- *  Destination URL (form.action)
- *
  * @property {'post'|'get'} [method='post']
- *  HTTP method; for GET the fields become query params.
- *
  * @property {Array<{name:string,value:any}>} fields
- *  Fields to send. Values are coerced with String(value). Empty `name` ignored.
- *
  * @property {HTMLElement|ShadowRoot} [context]
- *  Where to temporarily attach the form. Can be a ShadowRoot (if connected to document).
- *  Must be in live DOM; DocumentFragment will NOT work.
- *
  * @property {boolean} [openInNewTab=false]
- *  If true, submit into a new tab/window (target=_blank or named).
- *
  * @property {string} [newTabName='']
- *  Named browsing context for reuse (e.g. "handoff_tab").
- *
  * @property {boolean} [focusNewTab=true]
- *  Attempt to focus the reused tab after submit. Works only for named tabs.
- *
  * @property {'application/x-www-form-urlencoded'|'multipart/form-data'} [enctype='application/x-www-form-urlencoded']
- *  Form encoding type.
- *
  * @property {string} [acceptCharset='utf-8']
- *  Charset for form submission.
- *
  * @property {boolean} [novalidate=true]
- *  Skip HTML5 validation before submit.
- *
  * @property {'on'|'off'} [autocomplete='off']
- *  Form-level autocomplete hint.
- *
  * @property {string} [referrerPolicy='no-referrer']
- *  Referrer policy (modern browsers only).
- *
  * @property {string} [rel]
- *  Custom rel attribute. If omitted and opening new tab, automatically enforced "noopener noreferrer".
- *
  * @property {boolean} [serializeGetInUrl=false]
- *  For GET requests, append fields directly to action URL (instead of hidden inputs).
- *
  * @property {(ctx:{form:HTMLFormElement, fields:Record<string,string>})=>void} [onBeforeSubmit]
- *  Hook executed right before submit().
- *
  * @property {(ctx:{form:HTMLFormElement})=>void} [onAfterSubmit]
- *  Hook executed immediately after submit().
- *
  * @property {(err:unknown)=>void} [onError]
- *  Hook called if an error is thrown (validation/runtime).
  */
+
+/** @param {unknown} v @returns {v is ShadowRoot} */
+function isShadowRootSafe(v) {
+  return (
+    !!v &&
+    typeof v === 'object' &&
+    (
+      (typeof ShadowRoot !== 'undefined' && v instanceof ShadowRoot) ||
+      ('host' in /** @type {any} */(v) && /** @type {any} */(v).nodeType === Node.DOCUMENT_FRAGMENT_NODE)
+    )
+  );
+}
+
+/** @param {unknown} v @returns {v is HTMLElement} */
+function isHTMLElementSafe(v) {
+  return !!v && v instanceof HTMLElement;
+}
+
+/** @param {unknown} v @returns {boolean} */
+function isConnectedNode(v) {
+  return !!(/** @type {Node} */(v))?.isConnected;
+}
+
+/**
+ * Resolve context where the temporary form will be attached.
+ * Supports HTMLElement and ShadowRoot. Falls back to document.body if not connected.
+ * @param {unknown} ctx
+ * @returns {HTMLElement | ShadowRoot}
+ */
+function resolveHost(ctx) {
+  if (isShadowRootSafe(ctx)) {
+    return isConnectedNode(ctx) ? /** @type {ShadowRoot} */(ctx) : document.body;
+  }
+  if (isHTMLElementSafe(ctx)) {
+    return isConnectedNode(ctx) ? /** @type {HTMLElement} */(ctx) : document.body;
+  }
+  return document.body;
+}
 
 /**
  * Dynamically creates, submits, and cleans up an HTML form.
@@ -105,37 +109,17 @@ export function submitFormToEndpoint(opts) {
       throw new Error('submitFormToEndpoint: "fields" must be a non-empty array.');
     }
 
-    /**
-     * Resolve context where the temporary form will be attached.
-     * Supports HTMLElement and ShadowRoot.
-     * @param {unknown} ctx
-     * @returns {HTMLElement|ShadowRoot}
-     */
-    const resolveHost = (ctx) => {
-      if (ctx && typeof ctx === 'object') {
-        const isShadowRoot =
-          (typeof ShadowRoot !== 'undefined' && ctx instanceof ShadowRoot) ||
-          (ctx.nodeType === 11 && 'host' in ctx);
-        if (isShadowRoot) {
-          return ctx.isConnected ? ctx : document.body;
-        }
-        if (ctx instanceof HTMLElement) {
-          return ctx.isConnected ? ctx : document.body;
-        }
-      }
-      return document.body;
-    };
-
     const host = resolveHost(context);
 
-    // --- Prepare URL and fields
+    // --- Prepare URL and fields (без continue)
     let finalAction = action;
     /** @type {Record<string,string>} */
-    const flat = {};
-    for (const f of fields) {
-      if (!f?.name) continue;
-      flat[f.name] = f.value != null ? String(f.value) : '';
-    }
+    const flat = (fields || []).reduce((acc, f) => {
+      if (f && typeof f.name === 'string' && f.name) {
+        acc[f.name] = f.value != null ? String(f.value) : '';
+      }
+      return acc;
+    }, {});
 
     // --- Optional: serialize GET fields directly into URL
     if (method.toLowerCase() === 'get' && serializeGetInUrl) {
@@ -155,7 +139,6 @@ export function submitFormToEndpoint(opts) {
     // --- Create form
     form = document.createElement('form');
 
-    // Defensive attributes
     if (novalidate) form.setAttribute('novalidate', '');
     if (autocomplete) form.setAttribute('autocomplete', autocomplete);
     if (referrerPolicy) form.setAttribute('referrerpolicy', referrerPolicy);
@@ -168,11 +151,7 @@ export function submitFormToEndpoint(opts) {
     // --- Target & rel logic
     if (openInNewTab) {
       form.target = newTabName || '_blank';
-      if (rel == null || rel === '') {
-        form.setAttribute('rel', 'noopener noreferrer'); // secure default
-      } else {
-        form.setAttribute('rel', rel);
-      }
+      form.setAttribute('rel', rel == null || rel === '' ? 'noopener noreferrer' : rel);
     } else if (rel) {
       form.setAttribute('rel', rel);
     }
@@ -198,17 +177,12 @@ export function submitFormToEndpoint(opts) {
     form.submit();
 
     // --- Best-effort focus only for named tabs (reuse)
-    if (
-      openInNewTab &&
-      focusNewTab &&
-      newTabName &&
-      form.target === newTabName
-    ) {
+    if (openInNewTab && focusNewTab && newTabName && form.target === newTabName) {
       try {
         const win = window.open('', newTabName);
         win?.focus?.();
       } catch {
-        // ignored (browser restrictions)
+        // ignored
       }
     }
 
