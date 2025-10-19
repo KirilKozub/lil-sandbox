@@ -152,4 +152,3 @@ export function submitFormToEndpoint(opts) {
     try { form?.remove(); } catch {}
   }
 }
-```0
