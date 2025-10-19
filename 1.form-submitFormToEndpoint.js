@@ -1,15 +1,8 @@
 /**
  * @file submitFormToEndpoint.js
- * @description
  * Dynamically creates a <form>, injects hidden inputs, submits it (GET/POST), and removes it.
- * Designed for secure handoff flows where a real browser navigation (not fetch/XHR) is required.
- *
- * ✅ Features:
- * - Supports HTMLElement or ShadowRoot as context.
- * - Secure defaults: novalidate, autocomplete="off", referrerpolicy="no-referrer".
- * - Auto-enforces rel="noopener noreferrer" if opening new tab and rel not set.
- * - Optional serializeGetInUrl to inline GET params into URL.
- * - Focus attempt only for named tabs (reuse case), ignored for _blank.
+ * Supports HTMLElement/ShadowRoot context, serializeGetInUrl, secure defaults,
+ * auto rel for _blank, and focus attempt only for named tabs.
  */
 
 /**
@@ -35,46 +28,28 @@
 
 /** @param {unknown} v @returns {v is ShadowRoot} */
 function isShadowRootSafe(v) {
-  return (
-    !!v &&
-    typeof v === 'object' &&
-    (
-      (typeof ShadowRoot !== 'undefined' && v instanceof ShadowRoot) ||
-      ('host' in /** @type {any} */(v) && /** @type {any} */(v).nodeType === Node.DOCUMENT_FRAGMENT_NODE)
-    )
+  return !!v && typeof v === 'object' && (
+    (typeof ShadowRoot !== 'undefined' && v instanceof ShadowRoot) ||
+    ('host' in /** @type {any} */(v) && /** @type {any} */(v).nodeType === Node.DOCUMENT_FRAGMENT_NODE)
   );
 }
-
 /** @param {unknown} v @returns {v is HTMLElement} */
-function isHTMLElementSafe(v) {
-  return !!v && v instanceof HTMLElement;
-}
-
+function isHTMLElementSafe(v) { return !!v && v instanceof HTMLElement; }
 /** @param {unknown} v @returns {boolean} */
-function isConnectedNode(v) {
-  return !!(/** @type {Node} */(v))?.isConnected;
-}
+function isConnectedNode(v) { return !!(/** @type {Node} */(v))?.isConnected; }
 
 /**
- * Resolve context where the temporary form will be attached.
- * Supports HTMLElement and ShadowRoot. Falls back to document.body if not connected.
  * @param {unknown} ctx
- * @returns {HTMLElement | ShadowRoot}
+ * @returns {HTMLElement|ShadowRoot}
  */
 function resolveHost(ctx) {
-  if (isShadowRootSafe(ctx)) {
-    return isConnectedNode(ctx) ? /** @type {ShadowRoot} */(ctx) : document.body;
-  }
-  if (isHTMLElementSafe(ctx)) {
-    return isConnectedNode(ctx) ? /** @type {HTMLElement} */(ctx) : document.body;
-  }
+  if (isShadowRootSafe(ctx)) return isConnectedNode(ctx) ? /** @type {ShadowRoot} */(ctx) : document.body;
+  if (isHTMLElementSafe(ctx)) return isConnectedNode(ctx) ? /** @type {HTMLElement} */(ctx) : document.body;
   return document.body;
 }
 
 /**
- * Dynamically creates, submits, and cleans up an HTML form.
  * @param {SubmitFormOptions} opts
- * @throws {Error} If invalid or missing options.
  */
 export function submitFormToEndpoint(opts) {
   const {
@@ -101,27 +76,20 @@ export function submitFormToEndpoint(opts) {
   let form;
 
   try {
-    // --- Basic validation
-    if (!action || typeof action !== 'string') {
-      throw new Error('submitFormToEndpoint: "action" is required (string).');
-    }
-    if (!Array.isArray(fields) || fields.length === 0) {
-      throw new Error('submitFormToEndpoint: "fields" must be a non-empty array.');
-    }
+    if (!action || typeof action !== 'string') throw new Error('submitFormToEndpoint: "action" is required (string).');
+    if (!Array.isArray(fields) || fields.length === 0) throw new Error('submitFormToEndpoint: "fields" must be a non-empty array.');
 
     const host = resolveHost(context);
 
-    // --- Prepare URL and fields (без continue)
+    // Build flat map (без continue)
     let finalAction = action;
     /** @type {Record<string,string>} */
     const flat = (fields || []).reduce((acc, f) => {
-      if (f && typeof f.name === 'string' && f.name) {
-        acc[f.name] = f.value != null ? String(f.value) : '';
-      }
+      if (f && typeof f.name === 'string' && f.name) acc[f.name] = f.value != null ? String(f.value) : '';
       return acc;
     }, {});
 
-    // --- Optional: serialize GET fields directly into URL
+    // Inline GET params into URL if requested
     if (method.toLowerCase() === 'get' && serializeGetInUrl) {
       try {
         const url = new URL(finalAction, window.location.href);
@@ -129,16 +97,13 @@ export function submitFormToEndpoint(opts) {
         finalAction = url.toString();
       } catch {
         const sep = finalAction.includes('?') ? '&' : '?';
-        const q = Object.entries(flat)
-          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-          .join('&');
+        const q = Object.entries(flat).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
         finalAction = finalAction + sep + q;
       }
     }
 
-    // --- Create form
+    // Create form
     form = document.createElement('form');
-
     if (novalidate) form.setAttribute('novalidate', '');
     if (autocomplete) form.setAttribute('autocomplete', autocomplete);
     if (referrerPolicy) form.setAttribute('referrerpolicy', referrerPolicy);
@@ -148,7 +113,6 @@ export function submitFormToEndpoint(opts) {
     form.enctype = enctype;
     form.acceptCharset = acceptCharset;
 
-    // --- Target & rel logic
     if (openInNewTab) {
       form.target = newTabName || '_blank';
       form.setAttribute('rel', rel == null || rel === '' ? 'noopener noreferrer' : rel);
@@ -156,34 +120,28 @@ export function submitFormToEndpoint(opts) {
       form.setAttribute('rel', rel);
     }
 
-    // --- Add hidden inputs unless GET was serialized directly
+    // Add hidden inputs (без continue). Пропускаем, если GET-in-URL включён.
     if (!(method.toLowerCase() === 'get' && serializeGetInUrl)) {
-      for (const { name, value } of fields) {
-        if (!name) continue;
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = String(name);
-        input.value = value != null ? String(value) : '';
-        form.appendChild(input);
+      for (const item of fields) {
+        const name = item?.name;
+        if (typeof name === 'string' && name) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = item.value != null ? String(item.value) : '';
+          form.appendChild(input);
+        }
       }
     }
 
-    // --- Attach to DOM (required for submit())
     host.appendChild(form);
 
-    // --- Hooks
     try { onBeforeSubmit?.({ form, fields: flat }); } catch {}
-
     form.submit();
 
-    // --- Best-effort focus only for named tabs (reuse)
+    // Focus only for named tabs
     if (openInNewTab && focusNewTab && newTabName && form.target === newTabName) {
-      try {
-        const win = window.open('', newTabName);
-        win?.focus?.();
-      } catch {
-        // ignored
-      }
+      try { window.open('', newTabName)?.focus?.(); } catch {}
     }
 
     try { onAfterSubmit?.({ form }); } catch {}
@@ -194,3 +152,4 @@ export function submitFormToEndpoint(opts) {
     try { form?.remove(); } catch {}
   }
 }
+```0
