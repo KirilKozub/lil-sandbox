@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, html, css } from 'lit';
 
 export class SmartImage extends LitElement {
   static get properties() {
@@ -7,6 +7,8 @@ export class SmartImage extends LitElement {
       src: { type: String },
       /** @type {string} */
       _visibleSrc: { state: true },
+      /** @type {boolean} */
+      _loading: { state: true },
     };
   }
 
@@ -14,15 +16,51 @@ export class SmartImage extends LitElement {
     super();
     this.src = '';
     this._visibleSrc = '';
+    this._loading = false;
+  }
+
+  static get styles() {
+    return css`
+      :host {
+        display: inline-block;
+        position: relative;
+      }
+
+      img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        border: 3px solid #ddd;
+        border-top: 3px solid #555;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        from {
+          transform: translate(-50%, -50%) rotate(0deg);
+        }
+        to {
+          transform: translate(-50%, -50%) rotate(360deg);
+        }
+      }
+    `;
   }
 
   /**
-   * Lit lifecycle: reacts to prop changes
    * @param {Map<string, unknown>} changedProps
    */
   willUpdate(changedProps) {
     if (changedProps.has('src')) {
-      // preload new image first
       this._preloadAndShow(this.src);
     }
   }
@@ -38,23 +76,24 @@ export class SmartImage extends LitElement {
       return;
     }
 
+    this._loading = true;
+
     try {
       await preloadImage(url);
-      // only now show it
       this._visibleSrc = url;
     } catch (err) {
-      // optional: keep old image or clear
-      // this._visibleSrc = '';
-      // console.error('Image load failed', err);
+      console.warn('Image load failed:', err);
+    } finally {
+      this._loading = false;
     }
   }
 
   render() {
     return html`
-      <img
-        src=${this._visibleSrc || ''}
-        alt=""
-      />
+      ${this._visibleSrc
+        ? html`<img src=${this._visibleSrc} alt="Image" />`
+        : null}
+      ${this._loading ? html`<span class="loader"></span>` : null}
     `;
   }
 }
@@ -66,11 +105,8 @@ export class SmartImage extends LitElement {
 function preloadImage(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-
     img.onload = () => resolve();
     img.onerror = (err) => reject(err);
-
-    // start loading
     img.src = url;
   });
 }
