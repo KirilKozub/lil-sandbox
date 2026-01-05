@@ -1,0 +1,13 @@
+Another potential risk I see: on the frontend we currently pair answerBusinessKeyArray with answerArray by array index. This is fragile — if the backend ever reorders, filters, localizes, or returns mismatching lengths, labels can be shown for the wrong business key.
+It would be much safer if we had a structured payload, e.g. an answerMap (or an options array of objects) where each option contains both the unique key and the label.
+
+
+
+"answerMap": {
+      "RBA_SELF": "Mittel der Gesellschafter/-innen ...",
+      "RBA_COMP": "Aus regulärer Geschäftstätigkeit",
+      "THIRD": "Darlehensmittel Dritter ...",
+      "OTH": "Andere Mittelherkunft"
+    },
+    "order": ["RBA_SELF", "RBA_COMP", "THIRD", "OTH"]
+  }
