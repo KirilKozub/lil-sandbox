@@ -11,3 +11,35 @@ It would be much safer if we had a structured payload, e.g. an answerMap (or an 
     },
     "order": ["RBA_SELF", "RBA_COMP", "THIRD", "OTH"]
   }
+
+
+
+<section aria-labelledby="strategic-goods-title">
+  <h2 id="strategic-goods-title">
+    Strategische Güter/Dienstleistungen können der Ausfuhrkontrolle oder
+    Handelsembargos unterliegen. Diese sind:
+  </h2>
+
+  <ul>
+    <li>
+      <details>
+        <summary>Güter mit doppeltem Verwendungszweck</summary>
+        <p>…</p>
+      </details>
+    </li>
+
+    <li>
+      <details>
+        <summary>Militärische Güter</summary>
+        <p>…</p>
+      </details>
+    </li>
+
+    <li>
+      <details>
+        <summary>Nicht-konventionelle Güter mit doppeltem Verwendungszweck</summary>
+        <p>…</p>
+      </details>
+    </li>
+  </ul>
+</section>
